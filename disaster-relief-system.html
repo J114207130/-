@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>花蓮馬太鞍溪堰塞湖救災資訊整合系統</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Microsoft JhengHei', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+        
+        .header h1 {
+            color: #2d3748;
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+        
+        .update-time {
+            color: #718096;
+            font-size: 14px;
+        }
+        
+        .emergency-notice {
+            background: #fed7d7;
+            border-left: 4px solid #fc8181;
+            padding: 15px;
+            margin: 20px;
+            border-radius: 4px;
+        }
+        
+        .emergency-notice h3 {
+            color: #c53030;
+            margin-bottom: 8px;
+        }
+        
+        .emergency-notice a {
+            color: #2b6cb0;
+            font-weight: bold;
+            text-decoration: none;
+        }
+        
+        .emergency-notice a:hover {
+            text-decoration: underline;
+        }
+        
+        .tabs {
+            display: flex;
+            background: white;
+            padding: 0 20px;
+            overflow-x: auto;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .tab {
+            padding: 15px 25px;
+            cursor: pointer;
+            border: none;
+            background: none;
+            color: #4a5568;
+            font-size: 16px;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s;
+            white-space: nowrap;
+        }
+        
+        .tab:hover {
+            color: #2d3748;
+            background: #f7fafc;
+        }
+        
+        .tab.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+            font-weight: bold;
+        }
+        
+        .content {
+            padding: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .tab-content {
+            display: none;
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            animation: fadeIn 0.3s;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        #map {
+            height: 600px;
+            width: 100%;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .table-container {
+            overflow-x: auto;
+            margin-top: 20px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 800px;
+        }
+        
+        th {
+            background: #667eea;
+            color: white;
+            padding: 12px;
+            text-align: left;
+            font-weight: bold;
+            position: sticky;
+            top: 0;
+        }
+        
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        
+        tr:hover {
+            background: #f7fafc;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
+        .status-stable {
+            background: #c6f6d5;
+            color: #22543d;
+        }
+        
+        .status-need {
+            background: #fed7d7;
+            color: #742a2a;
+        }
+        
+        .status-high {
+            background: #fef5e7;
+            color: #975a16;
+        }
+        
+        .status-active {
+            background: #bee3f8;
+            color: #2c5282;
+        }
+        
+        .timeline {
+            position: relative;
+            padding-left: 30px;
+        }
+        
+        .timeline-item {
+            position: relative;
+            padding-bottom: 30px;
+        }
+        
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: -24px;
+            top: 8px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #667eea;
+            border: 3px solid white;
+            box-shadow: 0 0 0 2px #667eea;
+        }
+        
+        .timeline-item::after {
+            content: '';
+            position: absolute;
+            left: -18px;
+            top: 20px;
+            width: 2px;
+            height: calc(100% - 12px);
+            background: #e2e8f0;
+        }
+        
+        .timeline-item:last-child::after {
+            display: none;
+        }
+        
+        .timeline-date {
+            color: #667eea;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .timeline-content {
+            background: #f7fafc;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 3px solid #667eea;
+        }
+        
+        .timeline-title {
+            font-weight: bold;
+            color: #2d3748;
+            margin-bottom: 8px;
+        }
+        
+        .timeline-desc {
+            color: #4a5568;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        .stat-card h3 {
+            font-size: 14px;
+            margin-bottom: 10px;
+            opacity: 0.9;
+        }
+        
+        .stat-card .number {
+            font-size: 36px;
+            font-weight: bold;
+        }
+        
+        .filter-bar {
+            background: #f7fafc;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        .filter-bar select {
+            padding: 8px 15px;
+            border: 1px solid #cbd5e0;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 18px;
+            }
+            
+            .tabs {
+                padding: 0 10px;
+            }
+            
+            .tab {
+                padding: 12px 15px;
+                font-size: 14px;
+            }
+            
+            .content {
+                padding: 10px;
+            }
+            
+            #map {
+                height: 400px;
+            }
+            
+            table {
+                font-size: 14px;
+            }
+            
+            th, td {
+                padding: 8px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🚨 花蓮馬太鞍溪堰塞湖救災資訊整合系統</h1>
+        <div class="update-time">最後更新：2025年10月13日 | 資料來源：中央災害應變中心、花蓮縣政府</div>
+    </div>
+    
+    <div class="emergency-notice">
+        <h3>📢 緊急資訊</h3>
+        <p>
+            <strong>災害通報：</strong><a href="https://docs.google.com/forms/d/e/1FAIpQLSdfjOes6FgGa0pVnrymPts3805hordnCi2IrGbVyvoOBQucrw/viewform" target="_blank">填寫通報表單 →</a>
+            <span style="margin: 0 15px;">|</span>
+            <strong>完整地圖：</strong><a href="https://www.google.com/maps/d/viewer?mid=1euJJbnUwI0z0SNe4cWVcqzIDT6MMCrM&ehbc=2E312F" target="_blank">開啟光復災區地圖 →</a>
+        </p>
+    </div>
+    
+    <div class="tabs">
+        <button class="tab active" onclick="showTab('overview')">📊 總覽</button>
+        <button class="tab" onclick="showTab('map')">🗺️ 地圖</button>
+        <button class="tab" onclick="showTab('supplies')">📦 物資需求</button>
+        <button class="tab" onclick="showTab('personnel')">👥 人力資源</button>
+        <button class="tab" onclick="showTab('military')">🪖 兵力部屬</button>
+        <button class="tab" onclick="showTab('timeline')">📅 災害時間軸</button>
+    </div>
+    
+    <div class="content">
+        <div id="overview" class="tab-content active">
+            <h2 style="margin-bottom: 20px;">災情統計</h2>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h3>物資站點</h3>
+                    <div class="number">11</div>
+                </div>
+                <div class="stat-card">
+                    <h3>人力單位</h3>
+                    <div class="number">11</div>
+                </div>
+                <div class="stat-card">
+                    <h3>兵力部署</h3>
+                    <div class="number">8</div>
+                </div>
+                <div class="stat-card">
+                    <h3>災害事件</h3>
+                    <div class="number">27</div>
+                </div>
+            </div>
+            
+            <h2 style="margin: 30px 0 20px 0;">最新動態</h2>
+            <div class="timeline">
+                <div class="timeline-item">
+                    <div class="timeline-date">2025/10/12</div>
+                    <div class="timeline-content">
+                        <div class="timeline-title">解除紅色警戒倒數</div>
+                        <div class="timeline-desc">中央協調所總協調官季連成宣布，解除紅色警戒只差「撤離計畫演練」一項條件，已完成湖體穩定、堤防加高、疏濬工程三要件。</div>
+                    </div>
+                </div>
+                <div class="timeline-item">
+                    <div class="timeline-date">2025/10/10</div>
+                    <div class="timeline-content">
+                        <div class="timeline-title">壩體水位大幅下降</div>
+                        <div class="timeline-desc">林業保育署通報壩體水位已下降118公尺，探勘隊歷時5天成功抵達壩頂，持續監測中。</div>
+                    </div>
+                </div>
+                <div class="timeline-item">
+                    <div class="timeline-date">2025/10/6</div>
+                    <div class="timeline-content">
+                        <div class="timeline-title">災情統計更新</div>
+                        <div class="timeline-desc">中央災害應變中心更新：18人罹難、6人失聯、156人受傷。</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="map" class="tab-content">
+            <h2 style="margin-bottom: 20px;">救災資源地圖</h2>
+            <div style="margin-bottom: 20px;">
+                <iframe src="https://www.google.com/maps/d/embed?mid=1euJJbnUwI0z0SNe4cWVcqzIDT6MMCrM&ehbc=2E312F" width="100%" height="600" style="border:0; border-radius: 8px;" allowfullscreen="" loading="lazy"></iframe>
+            </div>
+            <div style="padding: 15px; background: #f7fafc; border-radius: 8px;">
+                <strong>💡 使用說明：</strong>
+                <ul style="margin: 10px 0 0 20px; line-height: 1.8;">
+                    <li>點擊地圖上的標記可查看詳細資訊</li>
+                    <li>使用左上角的圖層選單可以切換不同類型的資訊</li>
+                    <li>可以放大縮小地圖查看更多細節</li>
+                </ul>
+            </div>
+        </div>
+        
+        <div id="supplies" class="tab-content">
+            <h2 style="margin-bottom: 20px;">物資需求清單</h2>
+            <div class="filter-bar">
+                <select onchange="filterSupplies(this.value)">
+                    <option value="all">所有狀態</option>
+                    <option value="已穩定">已穩定</option>
+                    <option value="仍需補充">仍需補充</option>
+                    <option value="需求高">需求高</option>
+                </select>
+            </div>
+            <div class="table-container">
+                <table id="supplies-table">
+                    <thead>
+                        <tr>
+                            <th>時間</th>
+                            <th>地點名稱</th>
+                            <th>物資種類</th>
+                            <th>數量</th>
+                            <th>需求狀態</th>
+                            <th>備註</th>
+                        </tr>
+                    </thead>
+                    <tbody id="supplies-body"></tbody>
+                </table>
+            </div>
+        </div>
+        
+        <div id="personnel" class="tab-content">
+            <h2 style="margin-bottom: 20px;">人力資源表</h2>
+            <div class="filter-bar">
+                <select onchange="filterPersonnel(this.value)">
+                    <option value="all">所有類型</option>
+                    <option value="政府人員">政府人員</option>
+                    <option value="國軍">國軍</option>
+                    <option value="民眾志工">民眾志工</option>
+                </select>
+            </div>
+            <div class="table-container">
+                <table id="personnel-table">
+                    <thead>
+                        <tr>
+                            <th>時間</th>
+                            <th>單位名稱</th>
+                            <th>人數</th>
+                            <th>人員類型</th>
+                            <th>任務類型</th>
+                            <th>位置名稱</th>
+                            <th>任務狀態</th>
+                            <th>備註</th>
+                        </tr>
+                    </thead>
+                    <tbody id="personnel-body"></tbody>
+                </table>
+            </div>
+        </div>
+        
+        <div id="military" class="tab-content">
+            <h2 style="margin-bottom: 20px;">國軍兵力部屬</h2>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>日期</th>
+                            <th>部隊名稱</th>
+                            <th>類型</th>
+                            <th>人數</th>
+                            <th>行動任務</th>
+                            <th>部署地點</th>
+                            <th>建議事項</th>
+                        </tr>
+                    </thead>
+                    <tbody id="military-body"></tbody>
+                </table>
+            </div>
+        </div>
+        
+        <div id="timeline" class="tab-content">
+            <h2 style="margin-bottom: 20px;">災害時間軸</h2>
+            <div class="timeline" id="full-timeline"></div>
+        </div>
+    </div>
+    
+    <script>
+        // 資料
+        const suppliesData = [
+            {time: '2025/9/23', location: '光復糖廠前進指揮所', type: '飲水、乾糧、雨衣', qty: '約500件', status: '已穩定', note: '前線物資集散與指揮中心', lat: 23.6582, lng: 121.4065},
+            {time: '2025/9/24', location: '光復商工物資站A', type: '泡麵、礦泉水、毛毯', qty: '約300份', status: '仍需補充', note: '由超商平台捐贈，供災民領取', lat: 23.6595, lng: 121.4072},
+            {time: '2025/9/24', location: '大進國小收容中心', type: '衛生用品、嬰兒尿布、睡袋', qty: '約200組', status: '需求高', note: '收容嬰幼兒與女性災民', lat: 23.6611, lng: 121.4089},
+            {time: '2025/9/25', location: '光復車站志工集合點', type: '熱食、飲水、手套', qty: '每日約100人份', status: '輪值補充', note: '支援志工與清淤人員', lat: 23.657, lng: 121.4098},
+            {time: '2025/9/28', location: '光復國小臨時輔導站', type: '心理輔導手冊、文具包', qty: '約50套', status: '已穩定', note: '災後心理輔導據點', lat: 23.6565, lng: 121.4102},
+            {time: '2025/10/3', location: '光復市區清理點', type: '垃圾袋、清潔劑、掃具', qty: '約800件', status: '仍需補充', note: '支援居家清理與街道清淤', lat: 23.658, lng: 121.408},
+            {time: '2025/10/4-10/10', location: '光復國小旁臨時醫療站', type: '診療設備、藥品、心理輔具', qty: '約100組', status: '穩定供應', note: '國軍醫療隊設置支援災民健康', lat: 23.6565, lng: 121.4102},
+            {time: '2025/10/3-10/12', location: '光復鄉中央協調所', type: '行政用品、通訊設備、後勤物資', qty: '不定量', status: '常駐補充', note: '支援任務分派與物資調度', lat: 23.6585, lng: 121.407},
+            {time: '2025/10/4-10/6', location: '光復商工、光復國中校區', type: '課本、線上教學設備', qty: '約200套', status: '已穩定', note: '災後復課與遠距教學支援', lat: 23.659, lng: 121.4075},
+            {time: '2025/10/10', location: '馬太鞍溪壩頂探勘點', type: '防水布、沙包、照明設備', qty: '約300件', status: '穩定供應', note: '支援壩體穩定監測與防護工程', lat: 23.6995, lng: 121.2955}
+        ];
+        
+        const personnelData = [
+            {time: '2025/9/23', unit: '光復糖廠前進指揮所', count: 180, type: '政府人員', task: '救災支援', location: '光復鄉糖廠街19號', status: '運作中', note: '消防局出動87車180人，設物資集散點', lat: 23.6582, lng: 121.4065},
+            {time: '2025/9/23 下午', unit: '國軍工兵連', count: 120, type: '國軍', task: '清淤支援', location: '糖廠街與佛祖街一帶', status: '進駐中', note: '預計三日完成主要泥流清除', lat: 23.6582, lng: 121.4065},
+            {time: '2025/9/24', unit: '光復商工物資站A', count: 80, type: '政府人員', task: '物資發放', location: '光復鄉糖廠街', status: '運作中', note: '提供泡麵、礦泉水、毛毯等基本物資', lat: 23.6595, lng: 121.4072},
+            {time: '2025/9/24', unit: '大進國小收容中心', count: 120, type: '政府人員', task: '避難收容', location: '光復鄉大進村', status: '運作中', note: '設有飲水、乾糧、衛生用品等物資', lat: 23.6611, lng: 121.4089},
+            {time: '2025/9/24 上午', unit: '民間志工群組', count: 50, type: '民眾志工', task: '志工支援', location: '光復車站', status: '輪值中', note: '提供熱食、飲水、手套等支援物資', lat: 23.657, lng: 121.4098},
+            {time: '2025/9/28', unit: '光復國小臨時輔導站', count: 30, type: '政府人員', task: '心理輔導', location: '光復鄉光復路', status: '已轉型', note: '提供文具包、心理輔導手冊等物資', lat: 23.6565, lng: 121.4102},
+            {time: '2025/10/1-10/10', unit: '國軍醫療隊', count: 30, type: '國軍', task: '醫療支援', location: '光復國小旁臨時醫療站', status: '運作中', note: '提供基礎診療與心理輔導支援', lat: 23.6565, lng: 121.4102},
+            {time: '2025/10/3', unit: '光復市區清理點', count: '不定', type: '政府人員', task: '環境清理', location: '光復市區各路段', status: '進行中', note: '分發垃圾袋、清潔劑、掃具等清理物資', lat: 23.658, lng: 121.408},
+            {time: '2025/10/3-10/12', unit: '國軍協調所支援組', count: '不定', type: '國軍', task: '後勤協調', location: '光復鄉中央協調所', status: '常駐中', note: '支援行政院協調所進行任務分派與物資調度', lat: 23.6585, lng: 121.407},
+            {time: '2025/10/4-10/6', unit: '光復商工、光復國中', count: 200, type: '政府人員', task: '災後復課', location: '光復鄉校區', status: '恢復中', note: '提供課本、線上教學設備支援', lat: 23.659, lng: 121.4075},
+            {time: '2025/10/10', unit: '馬太鞍溪壩頂探勘點', count: 20, type: '政府人員', task: '工程監測', location: '萬榮鄉馬太鞍溪上游', status: '監測中', note: '分發防水布、沙包、照明設備等工程物資', lat: 23.6995, lng: 121.2955}
+        ];
+        
+        const militaryData = [
+            {date: '2025/09/25', unit: '第二、第四作戰區', type: '陸軍', count: '2000人次', task: '物資運送、道路清淤、市容整理', location: '光復鄉', suggestion: '增設夜間照明與輪班制度，確保持續作業'},
+            {date: '2025/09/26', unit: '第三、四、五作戰區', type: '陸軍', count: '累計逾2萬人次', task: '家屋清淤、家具搬運、重型裝備操作', location: '馬太鞍溪周邊', suggestion: '強化心理輔導與後勤補給，避免過勞'},
+            {date: '2025/09/26', unit: '工兵、化學兵、偵搜部隊', type: '專業兵種', count: '不明', task: '操作無人機、生命探測器、工兵車等裝備', location: '災區核心區', suggestion: '建立裝備調度清單與快速部署 SOP'},
+            {date: '2025/09/27', unit: '特戰部隊', type: '特戰', count: '不明', task: '深入災區、協助高風險區域清理', location: '光復鄉巷弄', suggestion: '設立高風險區域安全評估與撤離支援機制'},
+            {date: '2025/09/30', unit: '第3、5作戰區、海軍陸戰隊', type: '陸軍/海軍', count: '3000人次以上', task: '災區兵力輪替、現勘會銜、清淤支援', location: '馬太鞍溪周邊', suggestion: '建立兵力輪替排程與交通支援機制'},
+            {date: '2025/10/01', unit: '中校以
